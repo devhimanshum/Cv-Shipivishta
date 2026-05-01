@@ -51,10 +51,12 @@ export default function DashboardPage() {
     refetchCandidates();
   }, [refetchStats, refetchCandidates]);
 
-  const recent = recentCandidates.slice(0, 6);
-  const selectionRate = stats.total > 0
+  const recent         = recentCandidates.slice(0, 6);
+  const pending        = (stats as Record<string, number>).pending ?? 0;
+  const allCandidates  = stats.total + pending;          // total incl. pending
+  const selectionRate  = stats.total > 0
     ? Math.round((stats.selected / stats.total) * 100)
-    : 0;
+    : null;                                              // null = no decisions yet
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -137,9 +139,9 @@ export default function DashboardPage() {
             {/* Mini stats row */}
             <div className="relative z-10 mt-5 grid grid-cols-3 gap-3">
               {[
-                { label: 'Total CVs', value: statsLoading ? '—' : stats.total },
-                { label: 'Selected', value: statsLoading ? '—' : stats.selected },
-                { label: 'Selection Rate', value: statsLoading ? '—' : `${selectionRate}%` },
+                { label: 'Total CVs',       value: statsLoading ? '—' : allCandidates },
+                { label: 'Selected',        value: statsLoading ? '—' : stats.selected },
+                { label: 'Selection Rate',  value: statsLoading ? '—' : selectionRate !== null ? `${selectionRate}%` : '—' },
               ].map(s => (
                 <div key={s.label} className="rounded-xl px-3 py-2.5"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -157,7 +159,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div className="xl:col-span-1">
-                  <StatsCard title="Total Candidates" value={stats.total}      icon={Users}         color="primary" delay={0}    />
+                  <StatsCard title="Total Candidates" value={allCandidates}   icon={Users}         color="primary" delay={0}    />
                 </div>
                 <div className="xl:col-span-1">
                   <StatsCard title="Pending Review"   value={(stats as Record<string, number>).pending ?? 0} icon={ClipboardList} color="amber"   delay={0.05} />
@@ -174,11 +176,15 @@ export default function DashboardPage() {
                 <div className="xl:col-span-1">
                   <StatsCard
                     title="Selection Rate"
-                    value={`${selectionRate}%`}
+                    value={selectionRate !== null ? `${selectionRate}%` : '—'}
                     icon={TrendingUp}
                     color="navy"
                     delay={0.25}
-                    subtitle={`${stats.selected} of ${stats.total} approved`}
+                    subtitle={
+                      stats.total > 0
+                        ? `${stats.selected} of ${stats.total} reviewed`
+                        : 'No decisions yet'
+                    }
                   />
                 </div>
               </>

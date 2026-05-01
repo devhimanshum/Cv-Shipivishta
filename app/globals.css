@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #f5f8fc;
+    color: #0d1b2e;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply flex-1 overflow-y-auto;
+  }
+
+  .page-content {
+    @apply mx-auto max-w-7xl p-6;
+  }
+
+  /* Premium card base */
+  .card {
+    @apply rounded-2xl bg-white border border-slate-200/80 shadow-card;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:-translate-y-px;
+  }
+
+  /* Stat card gradient */
+  .stat-card {
+    @apply rounded-2xl border bg-white p-5 shadow-card;
+  }
+
+  /* Section heading */
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-widest text-slate-400;
+  }
+
+  /* Premium badge */
+  .badge-navy {
+    @apply inline-flex items-center gap-1 rounded-full bg-navy-800 px-2.5 py-0.5 text-[10px] font-semibold text-white;
+  }
+
+  .badge-maritime {
+    @apply inline-flex items-center gap-1 rounded-full bg-maritime-600 px-2.5 py-0.5 text-[10px] font-semibold text-white;
+  }
+}
+
+/* ── Premium scrollbar ── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7d9ee;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94b4d6;
+}
+
+/* ── Selection color ── */
+::selection {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: #0d1b2e;
+}
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.5);
+  outline-offset: 2px;
+}
+
+/* ── Shimmer skeleton ── */
+.skeleton {
+  background: linear-gradient(90deg, #e8eef6 25%, #f5f8fc 50%, #e8eef6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Premium gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #1d4ed8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-maritime {
+  background: linear-gradient(135deg, #C0392B 0%, #e74c3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass card ── */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Input premium style ── */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}

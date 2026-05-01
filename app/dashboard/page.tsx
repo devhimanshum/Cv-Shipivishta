@@ -5,12 +5,10 @@ export const dynamic = 'force-dynamic';
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, UserCheck, UserX, Copy, Mail, TrendingUp,
+  Users, Mail,
   ClipboardList, Activity, Ship, Anchor, Zap,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { StatSkeleton } from '@/components/ui/Skeleton';
 import { useStats, useCandidates } from '@/hooks/useCandidates';
 import { CandidateCard } from '@/components/candidates/CandidateCard';
 import { CardSkeleton } from '@/components/ui/Skeleton';
@@ -151,45 +149,6 @@ export default function DashboardPage() {
               ))}
             </div>
           </motion.div>
-
-          {/* ── Stats grid ── */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {statsLoading ? (
-              Array(6).fill(0).map((_, i) => <StatSkeleton key={i} />)
-            ) : (
-              <>
-                <div className="xl:col-span-1">
-                  <StatsCard title="Total Candidates" value={allCandidates}   icon={Users}         color="primary" delay={0}    />
-                </div>
-                <div className="xl:col-span-1">
-                  <StatsCard title="Pending Review"   value={(stats as Record<string, number>).pending ?? 0} icon={ClipboardList} color="amber"   delay={0.05} />
-                </div>
-                <div className="xl:col-span-1">
-                  <StatsCard title="Selected"         value={stats.selected}   icon={UserCheck}     color="green"   delay={0.1}  />
-                </div>
-                <div className="xl:col-span-1">
-                  <StatsCard title="Unselected"       value={stats.unselected} icon={UserX}         color="red"     delay={0.15} />
-                </div>
-                <div className="xl:col-span-1">
-                  <StatsCard title="Emails Processed" value={stats.processedEmails} icon={Mail}    color="purple"  delay={0.2}  />
-                </div>
-                <div className="xl:col-span-1">
-                  <StatsCard
-                    title="Selection Rate"
-                    value={selectionRate !== null ? `${selectionRate}%` : '—'}
-                    icon={TrendingUp}
-                    color="navy"
-                    delay={0.25}
-                    subtitle={
-                      stats.total > 0
-                        ? `${stats.selected} of ${stats.total} reviewed`
-                        : 'No decisions yet'
-                    }
-                  />
-                </div>
-              </>
-            )}
-          </div>
 
           {/* ── Pipeline ── */}
           <motion.div

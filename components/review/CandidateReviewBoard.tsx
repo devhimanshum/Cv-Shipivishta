@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserCheck, UserX, RefreshCw, Mail, Phone,
@@ -9,9 +9,11 @@ import {
   Copy, MessageSquare, CheckSquare, Square, Zap,
 } from 'lucide-react';
 import { CVPreviewButton } from '@/components/ui/CVPreviewButton';
+import { CandidateFilters, DEFAULT_FILTERS, applyFilters } from '@/components/candidates/CandidateFilters';
 import { apiClient } from '@/lib/utils/api-client';
 import { cn, formatDateTime } from '@/lib/utils/helpers';
 import toast from 'react-hot-toast';
+import type { FilterState } from '@/components/candidates/CandidateFilters';
 import type { Candidate, RankEntry } from '@/types';
 
 // ── helpers ───────────────────────────────────────────────────
@@ -342,6 +344,9 @@ export function CandidateReviewBoard() {
   const [error,        setError]        = useState<string | null>(null);
   const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set());
   const [bulkLoading,  setBulkLoading]  = useState(false);
+  const [filters,      setFilters]      = useState<FilterState>(DEFAULT_FILTERS);
+
+  const filtered = useMemo(() => applyFilters(candidates, filters), [candidates, filters]);
 
   const fetchCandidates = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
@@ -383,10 +388,10 @@ export function CandidateReviewBoard() {
   }
 
   function toggleAll() {
-    if (selectedIds.size === candidates.length) {
+    if (selectedIds.size === filtered.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(candidates.map(c => c.id)));
+      setSelectedIds(new Set(filtered.map(c => c.id)));
     }
   }
 
@@ -408,7 +413,7 @@ export function CandidateReviewBoard() {
     if (fail > 0) toast.error(`${fail} failed`);
   }
 
-  const allSelected  = candidates.length > 0 && selectedIds.size === candidates.length;
+  const allSelected  = filtered.length > 0 && selectedIds.size === filtered.length;
   const someSelected = selectedIds.size > 0;
 
   return (
@@ -436,9 +441,19 @@ export function CandidateReviewBoard() {
         </button>
       </div>
 
+      {/* ── Filters ── */}
+      {!loading && candidates.length > 0 && (
+        <CandidateFilters
+          filters={filters}
+          onChange={setFilters}
+          totalCount={candidates.length}
+          filteredCount={filtered.length}
+        />
+      )}
+
       {/* ── Bulk action toolbar ── */}
       <AnimatePresence>
-        {!loading && candidates.length > 0 && (
+        {!loading && filtered.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -450,7 +465,7 @@ export function CandidateReviewBoard() {
               {allSelected
                 ? <CheckSquare className="h-4 w-4 text-primary-500" />
                 : <Square className="h-4 w-4 text-slate-300" />}
-              {allSelected ? 'Deselect All' : `Select All (${candidates.length})`}
+              {allSelected ? 'Deselect All' : `Select All (${filtered.length})`}
             </button>
 
             {/* Divider */}
@@ -481,10 +496,10 @@ export function CandidateReviewBoard() {
               </>
             )}
 
-            {/* Rank match filter */}
-            {!someSelected && candidates.some(c => c.rankMatched !== undefined) && (
+            {/* Rank match indicator */}
+            {!someSelected && filtered.some(c => c.rankMatched !== undefined) && (
               <span className="ml-auto text-xs text-slate-400">
-                {candidates.filter(c => c.rankMatched).length} rank-matched
+                {filtered.filter(c => c.rankMatched).length} rank-matched
               </span>
             )}
           </motion.div>
@@ -513,10 +528,20 @@ export function CandidateReviewBoard() {
             <p className="text-sm text-slate-400 mt-1">No candidates pending review. Use AI Process to scan your inbox.</p>
           </div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50">
+            <ClipboardList className="h-8 w-8 text-slate-300" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-600">No matching candidates</p>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your filters to see results.</p>
+          </div>
+        </div>
       ) : (
         <AnimatePresence mode="popLayout">
           <div className="space-y-4">
-            {candidates.map(c => (
+            {filtered.map(c => (
               <CandidateCard
                 key={c.id}
                 candidate={c}

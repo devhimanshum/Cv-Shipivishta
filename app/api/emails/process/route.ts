@@ -20,7 +20,60 @@ import { analyzeCV } from '@/lib/gemini/agent';
 // import { uploadCVToStorage } from '@/lib/firebase/storage'; // TODO: enable once Firebase Storage is set up
 import type { ProcessEmailResult } from '@/types';
 
-/** Returns { matched, score } against active rank config requirements */
+/* ─── Maritime rank synonym map ───────────────────────────────
+   Each key is the canonical name; values are aliases that should
+   be treated as the same rank.  All comparisons are lower-case. */
+const RANK_SYNONYMS: Record<string, string[]> = {
+  'master':           ['captain', 'master mariner', 'commanding officer', 'cmd', 'capt'],
+  'chief officer':    ['c/o', 'chief mate', '1st officer', 'first officer', '1/o', 'chief off'],
+  'second officer':   ['2nd officer', '2/o', 'second mate', '2nd mate', 'second off'],
+  'third officer':    ['3rd officer', '3/o', 'third mate', '3rd mate', 'third off'],
+  'chief engineer':   ['c/e', 'chief eng', 'chief engr', '1st engineer', '1/e'],
+  'second engineer':  ['2nd engineer', '2/e', 'second engr', '2nd engr'],
+  'third engineer':   ['3rd engineer', '3/e', 'third engr', '3rd engr'],
+  'fourth engineer':  ['4th engineer', '4/e', 'fourth engr', '4th engr'],
+  'electrical officer': ['eto', 'electro technical officer', 'electro-technical officer', 'elec officer'],
+  'bosun':            ['boatswain', "bo'sun", 'bosun/ab'],
+  'able seaman':      ['ab', 'a.b.', 'able bodied', 'able-bodied seaman'],
+  'ordinary seaman':  ['os', 'o.s.', 'ord seaman'],
+  'motorman':         ['motor man', 'moterman'],
+  'oiler':            ['wiper', 'engine room rating'],
+  'cook':             ['chief cook', 'ship cook'],
+  'pump man':         ['pumpman'],
+};
+
+/** Normalise a rank string for comparison */
+function normalizeRank(rank: string): string {
+  return rank.toLowerCase().replace(/[^a-z0-9/]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Resolve a rank string to its canonical form (or itself if not found) */
+function canonicalRank(rank: string): string {
+  const n = normalizeRank(rank);
+  for (const [canon, aliases] of Object.entries(RANK_SYNONYMS)) {
+    if (n === canon || aliases.includes(n)) return canon;
+    // partial containment check (handles "Chief Officer Grade I" etc.)
+    if (n.includes(canon) || aliases.some(a => n.includes(a))) return canon;
+  }
+  return n;
+}
+
+/** True when two rank strings refer to the same position */
+function ranksMatch(configRank: string, cvRank: string): boolean {
+  if (!cvRank) return false;
+  return canonicalRank(configRank) === canonicalRank(cvRank);
+}
+
+/**
+ * Evaluates candidate rank history against the active config requirements.
+ *
+ * - Each enabled requirement is checked against ALL rank history entries
+ *   (cumulative duration across multiple contracts at the same rank).
+ * - A requirement is "met" when the cumulative duration ≥ minDurationMonths
+ *   (or minDurationMonths === 0, meaning no minimum).
+ * - rankMatchScore = % of enabled requirements that are fully met.
+ * - rankMatched = at least one requirement is met.
+ */
 function checkRankMatch(
   rankHistory: { rank: string; durationMonths?: number }[],
   config: RankConfig | null,
@@ -32,24 +85,24 @@ function checkRankMatch(
   const active = config.requirements.filter(r => r.enabled);
   if (!active.length) return { rankMatched: true, rankMatchScore: 100 };
 
-  let matchCount = 0;
+  let metCount = 0;
+
   for (const req of active) {
-    const found = rankHistory.find(e =>
-      e.rank?.toLowerCase().includes(req.rank.toLowerCase()) ||
-      req.rank.toLowerCase().includes(e.rank?.toLowerCase())
-    );
-    if (found) {
-      // If min duration configured, check it
-      if (req.minDurationMonths > 0) {
-        if ((found.durationMonths ?? 0) >= req.minDurationMonths) matchCount++;
-      } else {
-        matchCount++;
-      }
-    }
+    // Collect ALL history entries matching this required rank
+    const matching = rankHistory.filter(e => ranksMatch(req.rank, e.rank ?? ''));
+
+    if (matching.length === 0) continue; // rank not present in CV at all
+
+    // Sum durations across all contracts for this rank
+    const totalMonths = matching.reduce((sum, e) => sum + (e.durationMonths ?? 0), 0);
+
+    // Met = rank present AND cumulative duration satisfies minimum
+    const durationOk = req.minDurationMonths <= 0 || totalMonths >= req.minDurationMonths;
+    if (durationOk) metCount++;
   }
 
-  const score = Math.round((matchCount / active.length) * 100);
-  return { rankMatched: matchCount > 0, rankMatchScore: score };
+  const score = Math.round((metCount / active.length) * 100);
+  return { rankMatched: metCount > 0, rankMatchScore: score };
 }
 
 async function processEmail(

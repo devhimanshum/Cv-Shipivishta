@@ -61,7 +61,6 @@ export default function DashboardPage() {
       <Header
         title="Dashboard"
         subtitle="Maritime crew recruitment overview"
-        onRefresh={handleRefresh}
         actions={
           <button
             onClick={() => setProcessOpen(true)}

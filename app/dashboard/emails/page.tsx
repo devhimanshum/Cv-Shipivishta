@@ -63,7 +63,7 @@ export default function EmailsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Emails" subtitle="Outlook inbox and processed emails" onRefresh={fetchEmails} />
+      <Header title="Emails" subtitle="Outlook inbox and processed emails" />
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl p-6 space-y-5">

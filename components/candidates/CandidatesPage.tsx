@@ -98,7 +98,6 @@ export function CandidatesPage({ decision, title, subtitle }: CandidatesPageProp
       <Header
         title={title}
         subtitle={subtitle}
-        onRefresh={refetch}
         actions={
           <button
             onClick={handleExport}

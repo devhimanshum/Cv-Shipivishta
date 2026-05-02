@@ -67,12 +67,10 @@ function ranksMatch(configRank: string, cvRank: string): boolean {
 /**
  * Evaluates candidate rank history against the active config requirements.
  *
- * - Each enabled requirement is checked against ALL rank history entries
- *   (cumulative duration across multiple contracts at the same rank).
- * - A requirement is "met" when the cumulative duration ≥ minDurationMonths
- *   (or minDurationMonths === 0, meaning no minimum).
- * - rankMatchScore = % of enabled requirements that are fully met.
- * - rankMatched = at least one requirement is met.
+ * - Each enabled requirement is checked against ALL rank history entries.
+ * - A requirement is "met" when the rank is present in the CV history.
+ * - rankMatchScore = % of enabled requirements met.
+ * - rankMatched   = at least one requirement is met.
  */
 function checkRankMatch(
   rankHistory: { rank: string; durationMonths?: number }[],
@@ -88,17 +86,8 @@ function checkRankMatch(
   let metCount = 0;
 
   for (const req of active) {
-    // Collect ALL history entries matching this required rank
-    const matching = rankHistory.filter(e => ranksMatch(req.rank, e.rank ?? ''));
-
-    if (matching.length === 0) continue; // rank not present in CV at all
-
-    // Sum durations across all contracts for this rank
-    const totalMonths = matching.reduce((sum, e) => sum + (e.durationMonths ?? 0), 0);
-
-    // Met = rank present AND cumulative duration satisfies minimum
-    const durationOk = req.minDurationMonths <= 0 || totalMonths >= req.minDurationMonths;
-    if (durationOk) metCount++;
+    const hasRank = rankHistory.some(e => ranksMatch(req.rank, e.rank ?? ''));
+    if (hasRank) metCount++;
   }
 
   const score = Math.round((metCount / active.length) * 100);

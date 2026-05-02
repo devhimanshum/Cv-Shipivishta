@@ -8,7 +8,7 @@ export default function ConfigPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header
         title="Rank Configuration"
-        subtitle="Define maritime ranks and minimum sea service requirements"
+        subtitle="Set rank priority order, enable / disable ranks, and add custom ranks"
       />
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl p-6">

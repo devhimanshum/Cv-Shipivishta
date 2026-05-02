@@ -7,9 +7,11 @@ export type ReviewStatus = 'pending' | 'selected' | 'unselected';
 
 // ── Maritime rank configuration ──────────────────────────────
 export interface RankRequirement {
-  rank: string;
+  rank:    string;
   enabled: boolean;
-  minDurationMonths: number; // 0 = no minimum
+  order:   number; // 1-based priority order (1 = highest)
+  // legacy field kept for backward-compat reads; ignored going forward
+  minDurationMonths?: number;
 }
 
 export interface RankConfig {

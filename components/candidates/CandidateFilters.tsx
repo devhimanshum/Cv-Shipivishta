@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   Search, SlidersHorizontal, X, ChevronDown, ChevronUp,
-  Calendar, Clock, Anchor, Zap, AlertCircle, ArrowUpDown,
+  Clock, Anchor, ArrowUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/helpers';
 import type { Candidate } from '@/types';
@@ -136,11 +136,7 @@ export function activeFilterCount(f: FilterState): number {
   let n = 0;
   if (f.search)            n++;
   if (f.rankCategory)      n++;
-  if (f.dateFrom)          n++;
-  if (f.dateTo)            n++;
   if (f.minSeaService > 0) n++;
-  if (f.rankMatch !== 'all')            n++;
-  if (f.duplicate !== 'all')            n++;
   if (f.sortBy !== 'date' || f.sortDir !== 'desc') n++;
   return n;
 }
@@ -281,26 +277,8 @@ export function CandidateFilters({ filters, onChange, totalCount, filteredCount,
             </div>
           </div>
 
-          {/* Row 2: 3-column grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-
-            {/* Date range */}
-            <div>
-              <FilterLabel icon={Calendar}>Date Processed</FilterLabel>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date" value={filters.dateFrom}
-                  onChange={e => set('dateFrom', e.target.value)}
-                  className="flex-1 min-w-0 h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:border-primary-300"
-                />
-                <span className="text-xs text-slate-400 shrink-0">–</span>
-                <input
-                  type="date" value={filters.dateTo}
-                  onChange={e => set('dateTo', e.target.value)}
-                  className="flex-1 min-w-0 h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:border-primary-300"
-                />
-              </div>
-            </div>
+          {/* Row 2: 2-column grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Min sea service */}
             <div>
@@ -340,49 +318,6 @@ export function CandidateFilters({ filters, onChange, totalCount, filteredCount,
               </div>
             </div>
           </div>
-
-          {/* Row 3: Rank match + Duplicate */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* Rank match */}
-            <div>
-              <FilterLabel icon={Zap}>Rank Match</FilterLabel>
-              <div className="flex gap-1.5">
-                {(['all', 'matched', 'unmatched'] as const).map(v => (
-                  <button key={v} onClick={() => set('rankMatch', v)}
-                    className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all',
-                      filters.rankMatch === v
-                        ? v === 'matched'   ? 'bg-emerald-500 text-white border-emerald-500'
-                          : v === 'unmatched' ? 'bg-amber-500 text-white border-amber-500'
-                          : 'bg-slate-800 text-white border-slate-800'
-                        : 'border-slate-200 text-slate-500 bg-white hover:border-slate-300'
-                    )}
-                  >
-                    {v === 'all' ? 'All' : v === 'matched' ? '✓ Matched' : '✗ No match'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Duplicate */}
-            <div>
-              <FilterLabel icon={AlertCircle}>Duplicates</FilterLabel>
-              <div className="flex gap-1.5">
-                {(['all', 'no', 'yes'] as const).map(v => (
-                  <button key={v} onClick={() => set('duplicate', v)}
-                    className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all',
-                      filters.duplicate === v
-                        ? v === 'yes' ? 'bg-amber-500 text-white border-amber-500'
-                          : 'bg-slate-800 text-white border-slate-800'
-                        : 'border-slate-200 text-slate-500 bg-white hover:border-slate-300'
-                    )}
-                  >
-                    {v === 'all' ? 'All' : v === 'yes' ? 'Dups only' : 'No dups'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -392,17 +327,8 @@ export function CandidateFilters({ filters, onChange, totalCount, filteredCount,
           {filters.rankCategory && (
             <ActiveChip label={RANK_CATEGORIES[filters.rankCategory]?.label ?? filters.rankCategory} onRemove={() => set('rankCategory', '')} />
           )}
-          {(filters.dateFrom || filters.dateTo) && (
-            <ActiveChip label={`${filters.dateFrom || '…'} → ${filters.dateTo || '…'}`} onRemove={() => onChange({ ...filters, dateFrom: '', dateTo: '' })} />
-          )}
           {filters.minSeaService > 0 && (
             <ActiveChip label={`≥ ${seaLabel} sea service`} onRemove={() => set('minSeaService', 0)} />
-          )}
-          {filters.rankMatch !== 'all' && (
-            <ActiveChip label={filters.rankMatch === 'matched' ? 'Rank matched' : 'No rank match'} onRemove={() => set('rankMatch', 'all')} />
-          )}
-          {filters.duplicate !== 'all' && (
-            <ActiveChip label={filters.duplicate === 'yes' ? 'Dups only' : 'No dups'} onRemove={() => set('duplicate', 'all')} />
           )}
           {(filters.sortBy !== 'date' || filters.sortDir !== 'desc') && (
             <ActiveChip label={`Sort: ${filters.sortBy} ${filters.sortDir}`} onRemove={() => onChange({ ...filters, sortBy: 'date', sortDir: 'desc' })} />

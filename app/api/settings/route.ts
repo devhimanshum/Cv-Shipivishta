@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
         model:      process.env.OPENAI_MODEL || 'gpt-4o-mini',
         missingVars: !openaiConfigured ? ['OPENAI_API_KEY'] : [],
       },
+      // legacy alias kept for older client versions
+      gemini: {
+        configured: openaiConfigured,
+        model:      process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      },
       firebaseAdmin: {
         configured: !!(
           process.env.FIREBASE_ADMIN_PROJECT_ID &&

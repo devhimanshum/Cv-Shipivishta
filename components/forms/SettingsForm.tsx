@@ -11,8 +11,22 @@ import { cn } from '@/lib/utils/helpers';
 import toast from 'react-hot-toast';
 
 interface SettingsData {
-  outlook: { configured: boolean; inboxEmail: string; clientId: string };
-  gemini:  { configured: boolean; model: string };
+  outlook: {
+    configured: boolean;
+    inboxEmail: string;
+    clientId: string;
+    missingVars?: string[];
+  };
+  openai: {
+    configured: boolean;
+    model: string;
+    missingVars?: string[];
+  };
+  // legacy alias — API may return either key
+  gemini?: {
+    configured: boolean;
+    model: string;
+  };
 }
 
 type Tab = 'connections' | 'usage';
@@ -35,7 +49,7 @@ export function SettingsForm() {
     setTesting(true);
     try {
       const res = await apiClient.post<{ success: boolean; message: string }>(
-        '/api/settings', { type: 'test_outlook' }
+        '/api/settings', { type: 'test_outlook' },
       );
       if (res.success) toast.success(res.message);
       else toast.error(res.message);
@@ -46,7 +60,10 @@ export function SettingsForm() {
     }
   };
 
-  const openAiConfigured = !!process.env.NEXT_PUBLIC_APP_URL && (data?.gemini.configured ?? false);
+  // Support both old (gemini) and new (openai) API response shapes
+  const openaiData     = data?.openai ?? (data?.gemini ? { ...data.gemini, missingVars: [] } : null);
+  const openaiOk       = openaiData?.configured ?? false;
+  const outlookOk      = data?.outlook.configured ?? false;
 
   return (
     <div className="space-y-5">
@@ -77,7 +94,7 @@ export function SettingsForm() {
 
           {loading ? (
             <div className="space-y-4">
-              {[1,2].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-100" />)}
+              {[1, 2].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-100" />)}
             </div>
           ) : (
             <>
@@ -93,14 +110,14 @@ export function SettingsForm() {
                       <p className="text-xs text-slate-500">Configured via environment variables</p>
                     </div>
                   </div>
-                  <Badge variant={data?.outlook.configured ? 'success' : 'error'}>
-                    {data?.outlook.configured
+                  <Badge variant={outlookOk ? 'success' : 'error'}>
+                    {outlookOk
                       ? <><CheckCircle className="h-3 w-3 mr-1" />Connected</>
                       : <><XCircle className="h-3 w-3 mr-1" />Not configured</>}
                   </Badge>
                 </div>
 
-                {data?.outlook.configured && (
+                {outlookOk && data?.outlook && (
                   <div className="space-y-2 mb-4">
                     {[
                       { label: 'Inbox Email', value: data.outlook.inboxEmail },
@@ -118,16 +135,22 @@ export function SettingsForm() {
                 <Button
                   variant="outline" size="sm"
                   onClick={testOutlook} loading={testing}
-                  disabled={!data?.outlook.configured}
+                  disabled={!outlookOk}
                   icon={<RefreshCw className="h-3.5 w-3.5" />}
                 >
                   Test Connection
                 </Button>
 
-                {!data?.outlook.configured && (
-                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                    Add <code className="bg-white px-1 rounded">OUTLOOK_CLIENT_ID</code>, <code className="bg-white px-1 rounded">OUTLOOK_TENANT_ID</code>, <code className="bg-white px-1 rounded">OUTLOOK_CLIENT_SECRET</code>, and <code className="bg-white px-1 rounded">OUTLOOK_INBOX_EMAIL</code> to your <strong>.env.local</strong> file.
-                  </p>
+                {!outlookOk && (
+                  <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1">
+                    <p className="text-xs font-semibold text-amber-800">Missing environment variables:</p>
+                    {(data?.outlook.missingVars ?? ['OUTLOOK_CLIENT_ID', 'OUTLOOK_TENANT_ID', 'OUTLOOK_CLIENT_SECRET', 'OUTLOOK_INBOX_EMAIL']).map(v => (
+                      <code key={v} className="block text-xs text-amber-700 bg-white px-2 py-0.5 rounded border border-amber-100">{v}</code>
+                    ))}
+                    <p className="text-xs text-amber-600 pt-1">
+                      Add these in <strong>Vercel → Project → Settings → Environment Variables</strong>, then redeploy.
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -140,20 +163,20 @@ export function SettingsForm() {
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900">OpenAI (ChatGPT)</h3>
-                      <p className="text-xs text-slate-500">CV analysis · gpt-4o-mini</p>
+                      <p className="text-xs text-slate-500">CV analysis · {openaiData?.model ?? 'gpt-4o-mini'}</p>
                     </div>
                   </div>
-                  <Badge variant={data?.gemini.configured ? 'success' : 'error'}>
-                    {data?.gemini.configured
+                  <Badge variant={openaiOk ? 'success' : 'error'}>
+                    {openaiOk
                       ? <><CheckCircle className="h-3 w-3 mr-1" />Connected</>
                       : <><XCircle className="h-3 w-3 mr-1" />Not configured</>}
                   </Badge>
                 </div>
 
-                {data?.gemini.configured && (
+                {openaiOk && (
                   <div className="mt-4 space-y-2">
                     {[
-                      { label: 'Model',   value: 'gpt-4o-mini' },
+                      { label: 'Model',   value: openaiData?.model ?? 'gpt-4o-mini' },
                       { label: 'Pricing', value: '$0.15 / 1M input · $0.60 / 1M output' },
                       { label: 'Use',     value: 'Maritime CV rank extraction & analysis' },
                     ].map(row => (
@@ -165,10 +188,14 @@ export function SettingsForm() {
                   </div>
                 )}
 
-                {!data?.gemini.configured && (
-                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                    Add <code className="bg-white px-1 rounded">OPENAI_API_KEY</code> to your <strong>.env.local</strong> file.
-                  </p>
+                {!openaiOk && (
+                  <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1">
+                    <p className="text-xs font-semibold text-amber-800">Missing environment variable:</p>
+                    <code className="block text-xs text-amber-700 bg-white px-2 py-0.5 rounded border border-amber-100">OPENAI_API_KEY</code>
+                    <p className="text-xs text-amber-600 pt-1">
+                      Add in <strong>Vercel → Project → Settings → Environment Variables</strong>, then redeploy.
+                    </p>
+                  </div>
                 )}
               </div>
             </>

@@ -1,6 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -49,9 +48,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <p className="text-sm text-slate-500 mb-5">{error}</p>
           <div className="rounded-xl bg-slate-50 p-4 text-left text-xs text-slate-600 space-y-1.5 border border-slate-100">
             <p className="font-semibold text-slate-700 mb-1">Checklist:</p>
-            <p>1. Restart the dev server after adding .env.local</p>
-            <p>2. Enable Authentication in Firebase Console</p>
-            <p>3. Check browser console for detailed errors</p>
+            <p>1. Enable Email/Password authentication in Firebase Console</p>
+            <p>2. Add your deployment domain to Firebase → Authentication → Authorized Domains</p>
+            <p>3. Check browser console for the exact error details</p>
           </div>
           <button
             onClick={() => window.location.reload()}

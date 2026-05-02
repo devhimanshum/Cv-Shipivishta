@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { MaritimeAIResult, RankEntry } from '@/types';
 import { withRetry } from '@/lib/utils/helpers';
+import { getOpenAISettings } from '@/lib/firebase/integration-settings';
 
 export interface AIUsage {
   inputTokens: number;
@@ -15,14 +16,18 @@ function calcCost(inputTokens: number, outputTokens: number): number {
   return (inputTokens * 0.00000015) + (outputTokens * 0.0000006);
 }
 
-function getOpenAIConfig() {
+async function getOpenAIConfig() {
+  // 1. Try Firestore (set via Settings page in the app)
+  const stored = await getOpenAISettings();
+  if (stored?.apiKey) return { apiKey: stored.apiKey, model: stored.model || 'gpt-4o-mini' };
+
+  // 2. Fall back to environment variable
   const apiKey = process.env.OPENAI_API_KEY || '';
   const model  = process.env.OPENAI_MODEL   || 'gpt-4o-mini';
 
   if (!apiKey || apiKey.includes('PASTE') || apiKey === 'undefined') {
     throw new Error(
-      'OPENAI_API_KEY is not configured. ' +
-      'Go to Vercel → Project Settings → Environment Variables → add OPENAI_API_KEY, then redeploy.',
+      'OpenAI API key is not configured. Go to Settings → Connections and enter your OpenAI API key.',
     );
   }
   return { apiKey, model };
@@ -121,7 +126,7 @@ function parseResponse(raw: string): MaritimeAIResult {
 export async function analyzeCV(cvText: string): Promise<{ result: MaritimeAIResult; usage: AIUsage }> {
   if (!cvText.trim()) throw new Error('CV text is empty');
 
-  const { apiKey, model } = getOpenAIConfig();
+  const { apiKey, model } = await getOpenAIConfig();
   const client = new OpenAI({ apiKey });
 
   return withRetry(async () => {

@@ -1,29 +1,29 @@
 import axios from 'axios';
 import type { OutlookEmail, EmailAttachment } from '@/types';
+import { getOutlookSettings } from '@/lib/firebase/integration-settings';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const TOKEN_URL  = (tenantId: string) =>
   `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
 
-function getOutlookConfig() {
+async function getOutlookConfig() {
+  // 1. Try Firestore (set via Settings page in the app)
+  const stored = await getOutlookSettings();
+  if (stored) return stored;
+
+  // 2. Fall back to environment variables
   const clientId     = process.env.OUTLOOK_CLIENT_ID     || '';
   const tenantId     = process.env.OUTLOOK_TENANT_ID     || '';
   const clientSecret = process.env.OUTLOOK_CLIENT_SECRET || '';
   const inboxEmail   = process.env.OUTLOOK_INBOX_EMAIL   || '';
 
-  if (!clientId || !tenantId || !clientSecret || !inboxEmail) {
-    const missing = [
-      !clientId     && 'OUTLOOK_CLIENT_ID',
-      !tenantId     && 'OUTLOOK_TENANT_ID',
-      !clientSecret && 'OUTLOOK_CLIENT_SECRET',
-      !inboxEmail   && 'OUTLOOK_INBOX_EMAIL',
-    ].filter(Boolean).join(', ');
-    throw new Error(
-      `Outlook is not configured. Missing: ${missing}. ` +
-      'Add these in Vercel → Project Settings → Environment Variables, then redeploy.',
-    );
+  if (clientId && tenantId && clientSecret && inboxEmail) {
+    return { clientId, tenantId, clientSecret, inboxEmail };
   }
-  return { clientId, tenantId, clientSecret, inboxEmail };
+
+  throw new Error(
+    'Outlook is not configured. Go to Settings → Connections and enter your Outlook credentials.',
+  );
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
@@ -32,7 +32,7 @@ export async function getAccessToken(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expiresAt > now + 60_000) return cachedToken.token;
 
-  const { clientId, tenantId, clientSecret } = getOutlookConfig();
+  const { clientId, tenantId, clientSecret } = await getOutlookConfig();
   const params = new URLSearchParams({
     client_id:     clientId,
     client_secret: clientSecret,
@@ -52,13 +52,17 @@ export async function getAccessToken(): Promise<string> {
       const error = err.response?.data?.error;
       const desc  = err.response?.data?.error_description || '';
       if (error === 'invalid_client')
-        throw new Error('Outlook auth failed: invalid client ID or secret. Check OUTLOOK_CLIENT_ID and OUTLOOK_CLIENT_SECRET in Vercel dashboard.');
+        throw new Error('Outlook auth failed — invalid Client ID or Secret. Check your credentials in Settings.');
       if (error === 'unauthorized_client')
-        throw new Error('Outlook auth failed: client not authorised. Ensure admin consent is granted in Azure Portal.');
+        throw new Error('Outlook auth failed — admin consent not granted. Go to Azure Portal → API Permissions.');
       throw new Error(`Outlook token error (${error}): ${desc}`);
     }
     throw err;
   }
+}
+
+export function invalidateOutlookTokenCache() {
+  cachedToken = null;
 }
 
 function handleGraphError(err: unknown, inboxEmail: string): never {
@@ -66,20 +70,17 @@ function handleGraphError(err: unknown, inboxEmail: string): never {
     const status = err.response?.status;
     const code   = err.response?.data?.error?.code;
     const msg    = err.response?.data?.error?.message || '';
-    console.error(`[Graph ${status}] ${code}: ${msg}`);
-    if (status === 404) throw new Error(`Mailbox not found: "${inboxEmail}". Check OUTLOOK_INBOX_EMAIL is the correct shared/user mailbox.`);
-    if (status === 401) throw new Error('Outlook token invalid — check OUTLOOK_CLIENT_ID, OUTLOOK_TENANT_ID, OUTLOOK_CLIENT_SECRET in Vercel dashboard.');
-    if (status === 403) throw new Error(`Access denied to "${inboxEmail}". Grant Mail.Read (Application) permission and admin consent in Azure Portal → API Permissions.`);
-    if (status === 400) throw new Error(`Bad request to Graph API (${code}): ${msg}`);
+    if (status === 404) throw new Error(`Mailbox not found: "${inboxEmail}". Check the inbox email in Settings.`);
+    if (status === 401) throw new Error('Outlook token invalid — check Client ID, Tenant ID, and Secret in Settings.');
+    if (status === 403) throw new Error(`Access denied to "${inboxEmail}". Grant Mail.Read (Application) permission in Azure Portal.`);
     if (code)           throw new Error(`Microsoft Graph error (${code}): ${msg}`);
     throw new Error(`Graph API error ${status}: ${msg}`);
   }
   throw err;
 }
 
-// ── Fetch all inbox emails ────────────────────────────────────
 export async function fetchAllEmails(maxEmails = 50): Promise<OutlookEmail[]> {
-  const { inboxEmail } = getOutlookConfig();
+  const { inboxEmail } = await getOutlookConfig();
   const token = await getAccessToken();
   try {
     const res = await axios.get(`${GRAPH_BASE}/users/${inboxEmail}/messages`, {
@@ -94,11 +95,10 @@ export async function fetchAllEmails(maxEmails = 50): Promise<OutlookEmail[]> {
   } catch (err) { handleGraphError(err, inboxEmail); }
 }
 
-// ── Fetch single email with full body ─────────────────────────
 export async function fetchEmailById(
   emailId: string,
 ): Promise<OutlookEmail & { body: { content: string; contentType: string } }> {
-  const { inboxEmail } = getOutlookConfig();
+  const { inboxEmail } = await getOutlookConfig();
   const token = await getAccessToken();
   const encodedId = encodeURIComponent(emailId);
   try {
@@ -113,9 +113,8 @@ export async function fetchEmailById(
   } catch (err) { handleGraphError(err, inboxEmail); }
 }
 
-// ── Fetch emails with attachments ─────────────────────────────
 export async function fetchEmailsWithAttachments(maxEmails = 50): Promise<OutlookEmail[]> {
-  const { inboxEmail } = getOutlookConfig();
+  const { inboxEmail } = await getOutlookConfig();
   const token = await getAccessToken();
   const res = await axios.get(`${GRAPH_BASE}/users/${inboxEmail}/messages`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -129,9 +128,8 @@ export async function fetchEmailsWithAttachments(maxEmails = 50): Promise<Outloo
   return (res.data.value || []) as OutlookEmail[];
 }
 
-// ── Fetch attachment list ─────────────────────────────────────
 export async function fetchEmailAttachments(emailId: string): Promise<EmailAttachment[]> {
-  const { inboxEmail } = getOutlookConfig();
+  const { inboxEmail } = await getOutlookConfig();
   const token = await getAccessToken();
   const encodedId = encodeURIComponent(emailId);
   try {
@@ -143,11 +141,10 @@ export async function fetchEmailAttachments(emailId: string): Promise<EmailAttac
   } catch (err) { handleGraphError(err, inboxEmail); }
 }
 
-// ── Download a single attachment ──────────────────────────────
 export async function downloadAttachment(
   emailId: string, attachmentId: string,
 ): Promise<{ buffer: Buffer; contentType: string; name: string }> {
-  const { inboxEmail } = getOutlookConfig();
+  const { inboxEmail } = await getOutlookConfig();
   const token = await getAccessToken();
   const encodedId = encodeURIComponent(emailId);
   const res = await axios.get(
@@ -164,11 +161,11 @@ export async function validateOutlookConnection(): Promise<{ ok: boolean; error?
   catch (err) { return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' }; }
 }
 
-export function isOutlookConfigured(): boolean {
-  return !!(
-    process.env.OUTLOOK_CLIENT_ID &&
-    process.env.OUTLOOK_TENANT_ID &&
-    process.env.OUTLOOK_CLIENT_SECRET &&
-    process.env.OUTLOOK_INBOX_EMAIL
-  );
+export async function isOutlookConfigured(): Promise<boolean> {
+  try {
+    const stored = await getOutlookSettings();
+    if (stored) return true;
+    return !!(process.env.OUTLOOK_CLIENT_ID && process.env.OUTLOOK_TENANT_ID &&
+              process.env.OUTLOOK_CLIENT_SECRET && process.env.OUTLOOK_INBOX_EMAIL);
+  } catch { return false; }
 }
